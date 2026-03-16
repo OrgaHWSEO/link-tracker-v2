@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum ManualStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  DELETED
+}
+
+enum BacklinkStatus {
+  FOUND
+  NOT_FOUND
+  ERROR
+  REDIRECTED
+}
+
+enum IndexationStatus {
+  INDEXED
+  NOT_INDEXED
+  UNKNOWN
+}
+
+enum IndexationSource {
+  GSC
+  SCRAPING
+}
+
+enum AlertType {
+  BACKLINK_LOST
+  INDEXATION_CHANGE
+  CRAWL_ERROR
+  WEEKLY_SUMMARY
+}
+
+enum CheckFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  passwordHash      String   @map("password_hash")
+  role              Role     @default(MEMBER)
+  notificationPrefs Json     @default("{}") @map("notification_prefs")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  createdCampaigns Campaign[]       @relation("CampaignCreator")
+  memberships      CampaignMember[]
+  alerts           Alert[]
+
+  @@map("users")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  targetDomain   String         @map("target_domain")
+  status         CampaignStatus @default(ACTIVE)
+  checkFrequency CheckFrequency @default(WEEKLY) @map("check_frequency")
+  startDate      DateTime?      @map("start_date")
+  endDate        DateTime?      @map("end_date")
+  createdById    String         @map("created_by")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  createdBy User             @relation("CampaignCreator", fields: [createdById], references: [id])
+  members   CampaignMember[]
+  articles  Article[]
+
+  @@map("campaigns")
+}
+
+model CampaignMember {
+  id         String   @id @default(cuid())
+  campaignId String   @map("campaign_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@map("campaign_members")
+}
+
+model Article {
+  id           String       @id @default(cuid())
+  campaignId   String       @map("campaign_id")
+  articleUrl   String       @map("article_url")
+  targetUrl    String       @map("target_url")
+  anchorText   String?      @map("anchor_text")
+  manualStatus ManualStatus @default(PENDING) @map("manual_status")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  campaign         Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  backlinkChecks   BacklinkCheck[]
+  indexationChecks IndexationCheck[]
+  alerts           Alert[]
+
+  @@map("articles")
+}
+
+model BacklinkCheck {
+  id          String         @id @default(cuid())
+  articleId   String         @map("article_id")
+  checkedAt   DateTime       @default(now()) @map("checked_at")
+  status      BacklinkStatus
+  httpCode    Int?           @map("http_code")
+  redirectUrl String?        @map("redirect_url")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, checkedAt])
+  @@map("backlink_checks")
+}
+
+model IndexationCheck {
+  id        String           @id @default(cuid())
+  articleId String           @map("article_id")
+  checkedAt DateTime         @default(now()) @map("checked_at")
+  status    IndexationStatus
+  source    IndexationSource
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, checkedAt])
+  @@map("indexation_checks")
+}
+
+model Alert {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  articleId String?   @map("article_id")
+  type      AlertType
+  message   String
+  sentAt    DateTime  @default(now()) @map("sent_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([userId, sentAt])
+  @@map("alerts")
+}
