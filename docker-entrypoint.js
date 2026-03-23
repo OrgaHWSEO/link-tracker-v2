@@ -1,7 +1,14 @@
-const { execSync } = require('child_process');
-const path = require('path');
+const { execSync, fork } = require('child_process');
 
-// Run prisma db push using the prisma binary from node_modules
+// Build DATABASE_URL from DB_PASSWORD with proper URL encoding
+const dbPassword = process.env.DB_PASSWORD || 'changeme';
+const encodedPassword = encodeURIComponent(dbPassword);
+const databaseUrl = `postgresql://linktracker:${encodedPassword}@db:5432/linktracker`;
+
+process.env.DATABASE_URL = databaseUrl;
+console.log('DATABASE_URL built from DB_PASSWORD.');
+
+// Run prisma db push
 try {
   console.log('Running prisma db push...');
   execSync(
@@ -13,3 +20,7 @@ try {
   console.error('prisma db push failed:', e.message);
   process.exit(1);
 }
+
+// Start the Next.js server
+console.log('Starting server...');
+require('./server.js');

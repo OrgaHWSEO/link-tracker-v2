@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://linktracker:${DB_PASSWORD:-changeme}@db:5432/linktracker
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-production}
     depends_on:
