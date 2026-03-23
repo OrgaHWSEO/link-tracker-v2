@@ -5,7 +5,7 @@ const path = require('path');
 try {
   console.log('Running prisma db push...');
   execSync(
-    path.join(__dirname, 'node_modules', '.bin', 'prisma') + ' db push --skip-generate',
+    'node node_modules/prisma/build/index.js db push --skip-generate',
     { stdio: 'inherit', env: { ...process.env, HOME: '/tmp' } }
   );
   console.log('Database schema synced.');
