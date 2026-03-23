@@ -13,7 +13,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN ./node_modules/.bin/prisma generate
+RUN ls -la prisma/ && ls -la node_modules/.bin/prisma && node -v && ./node_modules/.bin/prisma version && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
 # Stage 3: Runtime
