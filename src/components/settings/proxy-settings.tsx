@@ -8,6 +8,7 @@ import {
   Square, MinusSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isValidProxyInput } from "@/lib/proxy-utils";
 
 interface Proxy {
   id: string;
@@ -21,8 +22,6 @@ interface ProxySettingsProps {
   initialProxies: Proxy[];
 }
 
-const VALID_PROTOCOLS = ["http://", "https://", "socks4://", "socks5://"];
-
 function maskProxyUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -34,10 +33,6 @@ function maskProxyUrl(url: string): string {
 function proxyProtocol(url: string): string {
   try { return new URL(url).protocol.replace(":", "").toUpperCase(); }
   catch { return "HTTP"; }
-}
-
-function isValidProxyUrl(url: string) {
-  return VALID_PROTOCOLS.some((p) => url.startsWith(p));
 }
 
 const PROTOCOL_COLORS: Record<string, string> = {
@@ -75,8 +70,8 @@ export function ProxySettings({ initialProxies }: ProxySettingsProps) {
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
-    const valid = lines.filter(isValidProxyUrl);
-    const invalid = lines.filter((l) => !isValidProxyUrl(l));
+    const valid = lines.filter(isValidProxyInput);
+    const invalid = lines.filter((l) => !isValidProxyInput(l));
     return { valid, invalid, total: lines.length };
   }, [bulkText]);
 
@@ -227,9 +222,11 @@ export function ProxySettings({ initialProxies }: ProxySettingsProps) {
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-500" />
         <div className="text-xs text-sky-700 space-y-0.5">
           <p className="font-semibold">Formats acceptés (un proxy par ligne en import masse)</p>
+          <p className="font-mono">host:port</p>
+          <p className="font-mono">host:port:password</p>
+          <p className="font-mono">host:port:user:password</p>
           <p className="font-mono">http://user:password@host:port</p>
           <p className="font-mono">socks5://user:password@host:port</p>
-          <p className="font-mono">http://host:port</p>
         </div>
       </div>
 
@@ -302,7 +299,7 @@ export function ProxySettings({ initialProxies }: ProxySettingsProps) {
               <textarea
                 value={bulkText}
                 onChange={(e) => setBulkText(e.target.value)}
-                placeholder={"http://user:pass@1.2.3.4:8080\nsocks5://user:pass@5.6.7.8:1080\nhttp://9.10.11.12:3128\n..."}
+                placeholder={"19.24.1.55:12345:monpassword\n1.2.3.4:8080:user:pass\nhttp://user:pass@5.6.7.8:1080\n9.10.11.12:3128\n..."}
                 rows={6}
                 className="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 placeholder:text-slate-400 placeholder:font-sans resize-y focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
