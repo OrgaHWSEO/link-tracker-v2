@@ -4,22 +4,32 @@ import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Megaphone, FileText, Link, AlertTriangle } from "lucide-react";
+import { OverviewStats } from "@/components/dashboard/overview-stats";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const [campaignCount, articleCount, recentArticles] = await Promise.all([
-    prisma.campaign.count({
-      where: { status: "ACTIVE" },
-    }),
+  const now = new Date();
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [campaignCount, articleCount, recentArticles, confirmedArticles, thisMoisArticles, lastMoisArticles] = await Promise.all([
+    prisma.campaign.count({ where: { status: "ACTIVE" } }),
     prisma.article.count(),
     prisma.article.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
       include: { campaign: { select: { name: true } } },
     }),
+    prisma.article.count({ where: { manualStatus: "CONFIRMED" } }),
+    prisma.article.count({ where: { createdAt: { gte: startOfThisMonth } } }),
+    prisma.article.count({ where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } } }),
   ]);
+
+  const ceMoisGrowth = lastMoisArticles > 0
+    ? Math.round(((thisMoisArticles - lastMoisArticles) / lastMoisArticles) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -27,6 +37,13 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold">Bonjour, {session.user.name}</h1>
         <p className="text-gray-500">Vue d&apos;ensemble de vos campagnes</p>
       </div>
+
+      <OverviewStats
+        total={articleCount}
+        actifs={confirmedArticles}
+        ceMois={thisMoisArticles}
+        ceMoisGrowth={ceMoisGrowth}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
