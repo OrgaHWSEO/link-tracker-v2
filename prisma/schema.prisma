@@ -161,6 +161,16 @@ model IndexationCheck {
   @@map("indexation_checks")
 }
 
+model Proxy {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  label     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("proxies")
+}
+
 model Alert {
   id        String    @id @default(cuid())
   userId    String    @map("user_id")

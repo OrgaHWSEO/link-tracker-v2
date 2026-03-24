@@ -12,7 +12,7 @@
  *  - Gestion automatique page consentement RGPD Google
  */
 import { prisma } from "@/lib/prisma";
-import { getBrowser, randomViewport } from "@/lib/browser/instance";
+import { getBrowser, randomViewport, getProxyConfig } from "@/lib/browser/instance";
 import { acquireGoogleSlot } from "@/lib/browser/google-queue";
 
 function sleep(ms: number) {
@@ -67,12 +67,14 @@ export async function checkIndexation(articleId: string): Promise<void> {
   let status: "INDEXED" | "NOT_INDEXED" | "UNKNOWN" = "UNKNOWN";
 
   const browser = await getBrowser();
+  const proxy = await getProxyConfig();
   const context = await browser.newContext({
     viewport: randomViewport(),
     locale: "fr-FR",
     extraHTTPHeaders: {
       "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
     },
+    ...(proxy ? { proxy } : {}),
   });
   const page = await context.newPage();
 
