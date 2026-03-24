@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,14 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { campaignCreateSchema } from "@/lib/validations/campaign";
-import { z } from "zod";
 import { Loader2 } from "lucide-react";
 
-type CampaignCreateInput = z.infer<typeof campaignCreateSchema>;
+interface FormValues {
+  name: string;
+  description: string;
+  targetDomain: string;
+  status: string;
+  checkFrequency: string;
+}
 
 interface CampaignFormProps {
-  defaultValues?: Partial<CampaignCreateInput> & { id?: string };
+  defaultValues?: Partial<FormValues> & { id?: string };
   isEditing?: boolean;
 }
 
@@ -34,23 +37,20 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CampaignCreateInput>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(campaignCreateSchema) as any,
+  } = useForm<FormValues>({
     defaultValues: {
-      name: "",
-      description: "",
-      targetDomain: "",
-      status: "ACTIVE",
-      checkFrequency: "WEEKLY",
-      ...defaultValues,
+      name: defaultValues?.name ?? "",
+      description: defaultValues?.description ?? "",
+      targetDomain: defaultValues?.targetDomain ?? "",
+      status: defaultValues?.status ?? "ACTIVE",
+      checkFrequency: defaultValues?.checkFrequency ?? "WEEKLY",
     },
   });
 
   const status = watch("status");
   const checkFrequency = watch("checkFrequency");
 
-  async function onSubmit(data: CampaignCreateInput) {
+  async function onSubmit(data: FormValues) {
     const url = isEditing ? `/api/campaigns/${defaultValues?.id}` : "/api/campaigns";
     const method = isEditing ? "PUT" : "POST";
 
@@ -86,8 +86,9 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="p-6 space-y-5">
+
             {/* Nom */}
             <div className="space-y-1.5">
               <Label htmlFor="name" className="text-sm font-medium text-gray-700">
@@ -95,7 +96,7 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
               </Label>
               <Input
                 id="name"
-                {...register("name")}
+                {...register("name", { required: "Le nom est requis" })}
                 placeholder="Ex : Campagne SEO Printemps 2025"
                 className="h-10"
               />
@@ -123,17 +124,12 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
               <Label htmlFor="targetDomain" className="text-sm font-medium text-gray-700">
                 Domaine cible <span className="text-red-500">*</span>
               </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                  https://
-                </span>
-                <Input
-                  id="targetDomain"
-                  {...register("targetDomain")}
-                  placeholder="monsite.com"
-                  className="h-10 pl-16"
-                />
-              </div>
+              <Input
+                id="targetDomain"
+                {...register("targetDomain", { required: "Le domaine cible est requis" })}
+                placeholder="ex : www.monsite.com"
+                className="h-10"
+              />
               {errors.targetDomain && (
                 <p className="text-xs text-red-500">{errors.targetDomain.message}</p>
               )}
@@ -145,7 +141,7 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
                 <Label className="text-sm font-medium text-gray-700">Statut</Label>
                 <Select
                   value={status}
-                  onValueChange={(v) => setValue("status", v as CampaignCreateInput["status"])}
+                  onValueChange={(v) => setValue("status", v)}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue />
@@ -177,9 +173,7 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
                 <Label className="text-sm font-medium text-gray-700">Fréquence de vérification</Label>
                 <Select
                   value={checkFrequency}
-                  onValueChange={(v) =>
-                    setValue("checkFrequency", v as CampaignCreateInput["checkFrequency"])
-                  }
+                  onValueChange={(v) => setValue("checkFrequency", v)}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue />
@@ -192,6 +186,7 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
                 </Select>
               </div>
             </div>
+
           </div>
 
           {/* Footer */}
@@ -204,7 +199,11 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="h-9 bg-indigo-600 hover:bg-indigo-700">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="h-9 bg-indigo-600 hover:bg-indigo-700"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
