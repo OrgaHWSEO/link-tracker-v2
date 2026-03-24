@@ -86,7 +86,24 @@ function DofollowBadge({ isDofollow, backlinkStatus }: { isDofollow?: boolean | 
 }
 
 function IndexedBadge({ status }: { status?: string }) {
-  if (!status || status === "UNKNOWN") return null;
+  // Aucune vérification effectuée
+  if (!status) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold w-fit bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-200">
+        <Eye className="h-3.5 w-3.5" />
+        Non vérifié
+      </span>
+    );
+  }
+  // Check effectué mais résultat indéterminé (CAPTCHA, erreur réseau…)
+  if (status === "UNKNOWN") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold w-fit bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-200">
+        <Eye className="h-3.5 w-3.5" />
+        Erreur check
+      </span>
+    );
+  }
   const indexed = status === "INDEXED";
   return (
     <span className={cn(

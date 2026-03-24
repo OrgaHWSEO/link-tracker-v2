@@ -1,17 +1,15 @@
 /**
  * Vérification d'indexation Google via Playwright.
  *
- * Stratégie : requête "site:URL_DE_L_ARTICLE" sur Google.
+ * Logique : "site:URL_DE_L_ARTICLE" sur Google.fr
  *  - Des résultats existent → INDEXED
- *  - "Aucun résultat" → NOT_INDEXED
- *  - CAPTCHA / erreur réseau → UNKNOWN (on réessaiera plus tard)
+ *  - "Aucun résultat" détecté → NOT_INDEXED
+ *  - CAPTCHA / ban IP / erreur réseau → UNKNOWN
  *
- * Anti-détection :
- *  - Stealth plugin (fingerprint réaliste, navigator.webdriver = false)
- *  - File d'attente globale : 1 requête à la fois + délai 6-11s
- *  - Viewport aléatoire + locale fr-FR
- *  - Scroll humain avant lecture des résultats
- *  - Acceptation automatique du bandeau cookie Google
+ * Anti-ban :
+ *  - Stealth plugin (fingerprint réaliste)
+ *  - File d'attente : 1 requête à la fois + délai 6-11 s aléatoire
+ *  - Gestion automatique page consentement RGPD Google
  */
 import { prisma } from "@/lib/prisma";
 import { getBrowser, randomViewport } from "@/lib/browser/instance";
@@ -21,6 +19,41 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
+/** Accepte la page de consentement RGPD Google si elle apparaît. */
+async function handleConsentPage(page: import("playwright").Page): Promise<void> {
+  const url = page.url();
+  if (!url.includes("consent.google") && !url.includes("accounts.google")) {
+    return; // Pas de page de consentement
+  }
+
+  // Google peut présenter plusieurs variantes du bouton d'acceptation
+  const candidates = [
+    'button:has-text("Tout accepter")',
+    'button:has-text("Accepter tout")',
+    'button:has-text("Accept all")',
+    'button:has-text("J\'accepte")',
+    'button:has-text("I agree")',
+    "[id='L2AGLb']",           // ID historique du bouton Google
+    "form[action*='save'] button[type='submit']",
+    "form button[value='1']",
+  ];
+
+  for (const sel of candidates) {
+    try {
+      const btn = page.locator(sel).first();
+      if (await btn.isVisible({ timeout: 1_500 })) {
+        await btn.click();
+        // Attend le retour sur la page de recherche
+        await page.waitForURL(/google\.(fr|com)\/search/, { timeout: 8_000 });
+        await sleep(600 + Math.random() * 600);
+        return;
+      }
+    } catch {
+      // Ce sélecteur n'a pas fonctionné → on essaie le suivant
+    }
+  }
+}
+
 export async function checkIndexation(articleId: string): Promise<void> {
   const article = await prisma.article.findUnique({
     where: { id: articleId },
@@ -28,7 +61,7 @@ export async function checkIndexation(articleId: string): Promise<void> {
   });
   if (!article) return;
 
-  // Attend son tour dans la file (1 requête Google à la fois)
+  // Attend son tour (1 requête Google à la fois, 6-11 s entre chaque)
   const release = await acquireGoogleSlot();
 
   let status: "INDEXED" | "NOT_INDEXED" | "UNKNOWN" = "UNKNOWN";
@@ -45,55 +78,51 @@ export async function checkIndexation(articleId: string): Promise<void> {
 
   try {
     const query = encodeURIComponent(`site:${article.articleUrl}`);
-    await page.goto(`https://www.google.fr/search?q=${query}&hl=fr&num=5`, {
-      waitUntil: "domcontentloaded",
-      timeout: 25_000,
-    });
+    await page.goto(
+      `https://www.google.fr/search?q=${query}&hl=fr&num=5`,
+      { waitUntil: "domcontentloaded", timeout: 25_000 }
+    );
 
-    // ── Bandeau cookie Google ──────────────────────────────────────
-    try {
-      const acceptBtn = page.locator(
-        'button:has-text("Tout accepter"), button:has-text("Accepter tout"), button:has-text("J\'accepte")'
-      );
-      if (await acceptBtn.first().isVisible({ timeout: 3_000 })) {
-        await acceptBtn.first().click();
-        await sleep(800 + Math.random() * 700);
-      }
-    } catch {
-      /* Pas de bandeau → on continue */
+    // ── Gestion page de consentement RGPD ─────────────────────────
+    await handleConsentPage(page);
+
+    // ── Détection ban IP / page Sorry ─────────────────────────────
+    const currentUrl = page.url();
+    if (
+      currentUrl.includes("/sorry/") ||
+      currentUrl.includes("sorry.google")
+    ) {
+      status = "UNKNOWN"; // IP bloquée, on ne peut pas conclure
+      return;
     }
 
-    // ── Détection CAPTCHA ──────────────────────────────────────────
-    const isCaptcha =
+    // ── Détection CAPTCHA (recaptcha iframe ou formulaire /sorry) ──
+    const hasCaptcha =
       (await page
-        .locator(
-          'iframe[src*="recaptcha"], #captcha-form, form[action*="/sorry/"]'
-        )
+        .locator('iframe[src*="recaptcha"], form[action*="/sorry/"]')
         .count()) > 0;
-
-    if (isCaptcha) {
-      // On ne peut pas contourner le CAPTCHA → UNKNOWN, on réessaiera
+    if (hasCaptcha) {
       status = "UNKNOWN";
       return;
     }
 
     // ── Comportement humain : scroll léger ────────────────────────
-    await page.mouse.wheel(0, 150 + Math.random() * 250);
-    await sleep(600 + Math.random() * 800);
+    await page.mouse.wheel(0, 150 + Math.random() * 200);
+    await sleep(500 + Math.random() * 700);
 
-    // Attend que le bloc de résultats (ou "aucun résultat") soit chargé
+    // Attend que le contenu principal soit chargé
     await page
-      .waitForSelector("#search, #topstuff, #rcnt", { timeout: 10_000 })
+      .waitForSelector("#search, #rso, #topstuff, #main", { timeout: 10_000 })
       .catch(() => {});
 
-    // ── Lecture des résultats ──────────────────────────────────────
+    // ── Détection "aucun résultat" ─────────────────────────────────
     const pageText = (await page.textContent("body")) ?? "";
-
     const noResultSignals = [
       "n'a renvoyé aucun résultat",
       "did not match any documents",
-      "aucun résultat",
+      "aucun document ne correspond",
       "no results found",
+      "0 résultat",
     ];
     const isNoResult = noResultSignals.some((s) =>
       pageText.toLowerCase().includes(s.toLowerCase())
@@ -101,22 +130,31 @@ export async function checkIndexation(articleId: string): Promise<void> {
 
     if (isNoResult) {
       status = "NOT_INDEXED";
+      return;
+    }
+
+    // ── Détection résultats organiques ────────────────────────────
+    // Plusieurs sélecteurs pour couvrir les différentes versions du HTML Google
+    const resultSelectors = [
+      "#search .g",
+      "#rso .g",
+      "#rso > div > div",
+      ".MjjYud",       // Layout moderne Google
+      "div[data-hveid]", // Attribut présent sur chaque résultat
+    ].join(", ");
+
+    const resultCount = await page.locator(resultSelectors).count();
+
+    if (resultCount > 0) {
+      status = "INDEXED";
     } else {
-      // Compte les résultats organiques dans #search
-      const resultCount = await page.locator("#search .g, #rso .g").count();
-      if (resultCount > 0) {
-        status = "INDEXED";
-      } else {
-        // Page chargée mais ni résultats ni "aucun résultat" détecté
-        // → pourrait être un changement de layout Google : on marque UNKNOWN
-        status = "UNKNOWN";
-      }
+      // Page chargée mais aucun signal clair → indéterminé
+      status = "UNKNOWN";
     }
   } catch {
     status = "UNKNOWN";
   } finally {
     await context.close();
-    // Libère le slot pour le prochain check en attente
     release();
   }
 
