@@ -10,22 +10,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, User, LogOut } from "lucide-react";
+import { Menu, LogOut, ChevronDown } from "lucide-react";
 import { MobileSidebar } from "./mobile-sidebar";
 
 export function Header() {
   const { data: session } = useSession();
+  const initials = session?.user?.name
+    ? session.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "?";
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
+    <header className="flex h-14 items-center justify-between border-b bg-white px-6 shrink-0">
       <div className="flex items-center gap-4">
         <Sheet>
           <SheetTrigger
-            render={<Button variant="ghost" size="icon" className="md:hidden" />}
+            render={<Button variant="ghost" size="icon" className="md:hidden h-8 w-8" />}
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
+          <SheetContent side="left" className="w-60 p-0">
             <MobileSidebar />
           </SheetContent>
         </Sheet>
@@ -33,19 +36,33 @@ export function Header() {
 
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button variant="ghost" className="gap-2" />}
+          render={
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 h-9 px-2 hover:bg-gray-50 rounded-lg"
+            />
+          }
         >
-          <User className="h-4 w-4" />
-          <span className="hidden sm:inline">{session?.user?.name}</span>
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+            {initials}
+          </div>
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-sm font-medium leading-none">{session?.user?.name}</span>
+          </div>
+          <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <div className="px-2 py-1.5 text-sm text-gray-500">
-            {session?.user?.email}
+        <DropdownMenuContent align="end" className="w-52">
+          <div className="px-3 py-2">
+            <p className="text-xs font-medium text-gray-900">{session?.user?.name}</p>
+            <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
+          <DropdownMenuItem
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-red-600 focus:text-red-600 cursor-pointer"
+          >
             <LogOut className="mr-2 h-4 w-4" />
-            Se deconnecter
+            Se déconnecter
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

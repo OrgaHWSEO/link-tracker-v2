@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
-import { Button } from "@/components/ui/button";
 import { CampaignTable } from "@/components/campaigns/campaign-table";
 import { Plus } from "lucide-react";
 
@@ -13,15 +12,14 @@ export default async function CampaignsPage() {
 
   const isAdmin = session.user.role === "ADMIN";
 
-  const where =
-    isAdmin
-      ? {}
-      : {
-          OR: [
-            { createdById: session.user.id },
-            { members: { some: { userId: session.user.id } } },
-          ],
-        };
+  const where = isAdmin
+    ? {}
+    : {
+        OR: [
+          { createdById: session.user.id },
+          { members: { some: { userId: session.user.id } } },
+        ],
+      };
 
   const campaigns = await prisma.campaign.findMany({
     where,
@@ -36,14 +34,14 @@ export default async function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Campagnes</h1>
-          <p className="text-gray-500">Gerez vos campagnes de backlinks</p>
+          <h1 className="text-xl font-semibold text-gray-900">Campagnes</h1>
+          <p className="text-sm text-gray-500">Gérez vos campagnes de backlinks</p>
         </div>
         <Link href="/campaigns/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
+          <button className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm">
+            <Plus className="h-4 w-4" />
             Nouvelle campagne
-          </Button>
+          </button>
         </Link>
       </div>
 
