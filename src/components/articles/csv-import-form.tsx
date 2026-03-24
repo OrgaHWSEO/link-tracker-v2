@@ -105,6 +105,9 @@ export function CsvImportForm({ campaignId }: { campaignId: string }) {
               <span><code className="text-indigo-600">article_url</code> — URL de l&apos;article</span>
               <span><code className="text-indigo-600">target_url</code> — URL cible du backlink</span>
               <span><code className="text-indigo-600">anchor_text</code> — Texte d&apos;ancre <span className="text-gray-400">(optionnel)</span></span>
+              <span><code className="text-indigo-600">source</code> — Plateforme / source <span className="text-gray-400">(optionnel)</span></span>
+              <span><code className="text-indigo-600">type</code> — ARTICLE, FORUM ou COMMUNIQUE <span className="text-gray-400">(optionnel)</span></span>
+              <span><code className="text-indigo-600">prix</code> — Prix en euros <span className="text-gray-400">(optionnel)</span></span>
               <span><code className="text-indigo-600">status</code> — Statut initial <span className="text-gray-400">(optionnel)</span></span>
             </div>
           </div>

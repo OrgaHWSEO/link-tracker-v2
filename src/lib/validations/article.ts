@@ -7,6 +7,9 @@ export const articleCreateSchema = z.object({
   manualStatus: z
     .enum(["PENDING", "SENT", "CONFIRMED", "DELETED"])
     .default("PENDING"),
+  prix: z.coerce.number().min(0).optional().nullable(),
+  type: z.enum(["ARTICLE", "FORUM", "COMMUNIQUE"]).default("ARTICLE"),
+  source: z.string().max(200).optional().default(""),
 });
 
 export const articleUpdateSchema = articleCreateSchema.partial();

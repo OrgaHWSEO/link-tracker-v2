@@ -56,6 +56,12 @@ enum CheckFrequency {
   MONTHLY
 }
 
+enum ArticleType {
+  ARTICLE
+  FORUM
+  COMMUNIQUE
+}
+
 model User {
   id                String   @id @default(cuid())
   name              String
@@ -113,6 +119,9 @@ model Article {
   targetUrl    String       @map("target_url")
   anchorText   String?      @map("anchor_text")
   manualStatus ManualStatus @default(PENDING) @map("manual_status")
+  prix         Float?
+  type         ArticleType  @default(ARTICLE)
+  source       String?
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
@@ -131,6 +140,7 @@ model BacklinkCheck {
   status      BacklinkStatus
   httpCode    Int?           @map("http_code")
   redirectUrl String?        @map("redirect_url")
+  isDofollow  Boolean?       @map("is_dofollow")
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 

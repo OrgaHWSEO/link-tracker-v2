@@ -39,6 +39,7 @@ export default async function CampaignDetailPage({
         orderBy: { createdAt: "desc" },
         include: {
           backlinkChecks: { orderBy: { checkedAt: "desc" }, take: 1 },
+          indexationChecks: { orderBy: { checkedAt: "desc" }, take: 1 },
         },
       },
     },

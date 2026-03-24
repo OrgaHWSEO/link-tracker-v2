@@ -40,26 +40,43 @@ export async function POST(
     targetUrl: string;
     anchorText: string;
     manualStatus: "PENDING" | "SENT" | "CONFIRMED" | "DELETED";
+    prix: number | null;
+    type: "ARTICLE" | "FORUM" | "COMMUNIQUE";
+    source: string;
   }[] = [];
   const importErrors: { row: number; message: string }[] = [];
 
   data.forEach((row, index) => {
+    const rawPrix = row.prix || row.price || "";
+    const prixValue = rawPrix ? parseFloat(rawPrix) : undefined;
+
+    const rawType = (row.type || "ARTICLE").toUpperCase();
+    const typeValue = ["ARTICLE", "FORUM", "COMMUNIQUE"].includes(rawType)
+      ? rawType
+      : "ARTICLE";
+
     const result = articleCreateSchema.safeParse({
       articleUrl: row.article_url || row.articleUrl || row.url_article,
       targetUrl: row.target_url || row.targetUrl || row.url_cible,
       anchorText: row.anchor_text || row.anchorText || row.ancre || "",
       manualStatus:
         (row.status || row.manualStatus || "PENDING").toUpperCase(),
+      prix: prixValue,
+      type: typeValue,
+      source: row.source || row.plateforme || "",
     });
 
     if (result.success) {
       validArticles.push({
         campaignId: params.campaignId,
         ...result.data,
+        prix: result.data.prix ?? null,
+        type: result.data.type as "ARTICLE" | "FORUM" | "COMMUNIQUE",
+        source: result.data.source ?? "",
       });
     } else {
       importErrors.push({
-        row: index + 2, // +2 for header row + 0-index
+        row: index + 2,
         message: result.error.issues.map((i) => i.message).join(", "),
       });
     }
