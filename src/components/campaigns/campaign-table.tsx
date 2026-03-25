@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Eye, Globe } from "lucide-react";
+import { Pencil, Trash2, Eye, Globe, Search, X } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   ACTIVE:    { label: "Active",    dot: "bg-emerald-400", bg: "bg-emerald-50", text: "text-emerald-700" },
@@ -30,6 +32,22 @@ interface CampaignTableProps {
 
 export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
   const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [activeDomain, setActiveDomain] = useState<string | null>(null);
+
+  const domains = useMemo(
+    () => Array.from(new Set(campaigns.map((c) => c.targetDomain))).sort(),
+    [campaigns]
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return campaigns.filter((c) => {
+      const matchSearch = !q || c.name.toLowerCase().includes(q) || c.targetDomain.toLowerCase().includes(q);
+      const matchDomain = !activeDomain || c.targetDomain === activeDomain;
+      return matchSearch && matchDomain;
+    });
+  }, [campaigns, search, activeDomain]);
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Supprimer la campagne "${name}" ? Cette action est irréversible.`)) return;
@@ -60,11 +78,76 @@ export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
   }
 
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="space-y-3">
+
+      {/* ── Recherche + filtres ──────────────────────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Barre de recherche */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Rechercher une campagne ou un domaine…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-800 placeholder-slate-400 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filtres par domaine */}
+        {domains.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="shrink-0 text-xs text-slate-400">Site :</span>
+            {domains.map((d) => (
+              <button
+                key={d}
+                onClick={() => setActiveDomain(activeDomain === d ? null : d)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-[11px] font-medium transition-colors",
+                  activeDomain === d
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                )}
+              >
+                <Globe className="h-3 w-3 shrink-0" />
+                {d}
+              </button>
+            ))}
+            {activeDomain && (
+              <button
+                onClick={() => setActiveDomain(null)}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <X className="h-3 w-3" />
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Tableau ─────────────────────────────────────────── */}
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Search className="mb-3 h-8 w-8 text-slate-300" />
+            <p className="text-sm font-medium text-slate-600">Aucun résultat</p>
+            <p className="mt-1 text-xs text-slate-400">Modifiez votre recherche ou réinitialisez les filtres.</p>
+          </div>
+        ) : (
+        <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-gray-50">
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Campagne</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Site</th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Statut</th>
             <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Articles</th>
             <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Membres</th>
@@ -74,18 +157,18 @@ export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {campaigns.map((campaign) => {
+          {filtered.map((campaign) => {
             const s = statusConfig[campaign.status] || statusConfig.ACTIVE;
             return (
               <tr key={campaign.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3.5">
-                  <div>
-                    <p className="font-medium text-gray-900">{campaign.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                      <Globe className="h-3 w-3" />
-                      {campaign.targetDomain}
-                    </p>
-                  </div>
+                  <p className="font-medium text-gray-900">{campaign.name}</p>
+                </td>
+                <td className="px-4 py-3.5">
+                  <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-600">
+                    <Globe className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    {campaign.targetDomain}
+                  </span>
                 </td>
                 <td className="px-4 py-3.5">
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${s.bg} ${s.text}`}>
@@ -135,7 +218,9 @@ export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
             );
           })}
         </tbody>
-      </table>
+        </table>
+        )}
+      </div>
     </div>
   );
 }
