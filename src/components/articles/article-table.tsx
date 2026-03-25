@@ -352,6 +352,7 @@ export function ArticleTable({ articles, campaignId, isAdmin }: ArticleTableProp
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1">
                         <button
+                          onClick={() => router.push(`/campaigns/${campaignId}/articles/${article.id}/edit`)}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
                           title="Modifier"
                         >

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Link2, Target, Type, Euro, Building2, Tag, ArrowLeft, Plus } from "lucide-react";
+import { Loader2, Link2, Target, Type, Euro, Building2, Tag, ArrowLeft, Plus, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FormValues {
@@ -18,8 +18,20 @@ interface FormValues {
   source: string;
 }
 
+interface ArticleData {
+  id: string;
+  articleUrl: string;
+  targetUrl: string;
+  anchorText: string | null;
+  manualStatus: string;
+  prix: number | null;
+  type: string;
+  source: string | null;
+}
+
 interface ArticleFormProps {
   campaignId: string;
+  article?: ArticleData;
 }
 
 const ARTICLE_TYPES = [
@@ -28,8 +40,10 @@ const ARTICLE_TYPES = [
   { value: "COMMUNIQUE", label: "Communiqué",   desc: "Presse / PR"        },
 ];
 
-export function ArticleForm({ campaignId }: ArticleFormProps) {
+export function ArticleForm({ campaignId, article }: ArticleFormProps) {
   const router = useRouter();
+  const isEdit = !!article;
+
   const {
     register,
     handleSubmit,
@@ -38,13 +52,13 @@ export function ArticleForm({ campaignId }: ArticleFormProps) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
-      articleUrl: "",
-      targetUrl: "",
-      anchorText: "",
-      manualStatus: "PENDING",
-      prix: "",
-      type: "ARTICLE",
-      source: "",
+      articleUrl: article?.articleUrl ?? "",
+      targetUrl:  article?.targetUrl ?? "",
+      anchorText: article?.anchorText ?? "",
+      manualStatus: article?.manualStatus ?? "PENDING",
+      prix: article?.prix != null ? String(article.prix) : "",
+      type: article?.type ?? "ARTICLE",
+      source: article?.source ?? "",
     },
   });
 
@@ -61,18 +75,22 @@ export function ArticleForm({ campaignId }: ArticleFormProps) {
       source: data.source,
     };
 
-    const res = await fetch(`/api/campaigns/${campaignId}/articles`, {
-      method: "POST",
+    const url = isEdit
+      ? `/api/campaigns/${campaignId}/articles/${article.id}`
+      : `/api/campaigns/${campaignId}/articles`;
+
+    const res = await fetch(url, {
+      method: isEdit ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
-      toast.error("Erreur lors de l'ajout");
+      toast.error(isEdit ? "Erreur lors de la modification" : "Erreur lors de l'ajout");
       return;
     }
 
-    toast.success("Backlink ajouté avec succès");
+    toast.success(isEdit ? "Backlink mis à jour" : "Backlink ajouté avec succès");
     router.push(`/campaigns/${campaignId}`);
     router.refresh();
   }
@@ -91,10 +109,10 @@ export function ArticleForm({ campaignId }: ArticleFormProps) {
           Retour à la campagne
         </button>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-          Nouveau backlink
+          {isEdit ? "Modifier le backlink" : "Nouveau backlink"}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Renseignez les informations du lien à surveiller.
+          {isEdit ? "Mettez à jour les informations du lien." : "Renseignez les informations du lien à surveiller."}
         </p>
       </div>
 
@@ -308,7 +326,12 @@ export function ArticleForm({ campaignId }: ArticleFormProps) {
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Ajout en cours…
+                {isEdit ? "Enregistrement…" : "Ajout en cours…"}
+              </>
+            ) : isEdit ? (
+              <>
+                <Save className="h-4 w-4" />
+                Enregistrer les modifications
               </>
             ) : (
               <>
