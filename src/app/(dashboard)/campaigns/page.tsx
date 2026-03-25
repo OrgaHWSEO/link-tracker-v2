@@ -24,7 +24,7 @@ export default async function CampaignsPage() {
   const campaigns = await prisma.campaign.findMany({
     where,
     include: {
-      _count: { select: { articles: true, members: true } },
+      _count: { select: { articles: true } },
       createdBy: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },

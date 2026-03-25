@@ -14,12 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2 } from "lucide-react";
 
 interface FormValues {
   name: string;
   description: string;
   targetDomain: string;
+  plateforme: string;
   status: string;
   checkFrequency: string;
 }
@@ -42,6 +43,7 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
       name: defaultValues?.name ?? "",
       description: defaultValues?.description ?? "",
       targetDomain: defaultValues?.targetDomain ?? "",
+      plateforme: defaultValues?.plateforme ?? "",
       status: defaultValues?.status ?? "ACTIVE",
       checkFrequency: defaultValues?.checkFrequency ?? "WEEKLY",
     },
@@ -133,6 +135,21 @@ export function CampaignForm({ defaultValues, isEditing = false }: CampaignFormP
               {errors.targetDomain && (
                 <p className="text-xs text-red-500">{errors.targetDomain.message}</p>
               )}
+            </div>
+
+            {/* Plateforme */}
+            <div className="space-y-1.5">
+              <Label htmlFor="plateforme" className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <Building2 className="h-3.5 w-3.5 text-gray-400" />
+                Plateforme
+                <span className="ml-auto text-[10px] font-normal text-gray-400">optionnel</span>
+              </Label>
+              <Input
+                id="plateforme"
+                {...register("plateforme")}
+                placeholder="Ex : SEMJuice, Getfluence, Rédac web…"
+                className="h-10"
+              />
             </div>
 
             {/* Statut + Fréquence */}

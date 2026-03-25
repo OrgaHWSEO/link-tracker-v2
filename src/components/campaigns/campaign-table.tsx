@@ -19,10 +19,11 @@ interface Campaign {
   id: string;
   name: string;
   targetDomain: string;
+  plateforme: string | null;
   status: string;
   createdAt: string;
   createdBy: { name: string };
-  _count: { articles: number; members: number };
+  _count: { articles: number };
 }
 
 interface CampaignTableProps {
@@ -150,7 +151,7 @@ export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Site</th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Statut</th>
             <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Articles</th>
-            <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Membres</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Plateforme</th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Créé par</th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
@@ -181,10 +182,11 @@ export function CampaignTable({ campaigns, isAdmin }: CampaignTableProps) {
                     {campaign._count.articles}
                   </span>
                 </td>
-                <td className="px-4 py-3.5 text-center">
-                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gray-100 px-2 text-xs font-semibold text-gray-700">
-                    {campaign._count.members}
-                  </span>
+                <td className="px-4 py-3.5">
+                  {campaign.plateforme
+                    ? <span className="text-xs text-slate-600">{campaign.plateforme}</span>
+                    : <span className="text-xs text-slate-300">—</span>
+                  }
                 </td>
                 <td className="px-4 py-3.5 text-gray-500 text-xs">{campaign.createdBy.name}</td>
                 <td className="px-4 py-3.5 text-gray-400 text-xs">

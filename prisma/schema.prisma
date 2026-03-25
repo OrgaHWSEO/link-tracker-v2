@@ -84,6 +84,7 @@ model Campaign {
   name           String
   description    String?
   targetDomain   String         @map("target_domain")
+  plateforme     String?
   status         CampaignStatus @default(ACTIVE)
   checkFrequency CheckFrequency @default(WEEKLY) @map("check_frequency")
   startDate      DateTime?      @map("start_date")
