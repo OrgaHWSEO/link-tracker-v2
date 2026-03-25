@@ -7,6 +7,7 @@ import {
   Trash2, ExternalLink, Link2Off, Globe,
   Pencil, RefreshCw, Search,
   CheckCircle2, XCircle, Eye, Link2, Store, ChevronDown, Filter,
+  ChevronsDownUp, ChevronsUpDown, RotateCcw, Loader2,
 } from "lucide-react";
 import { ArticleHistoryModal } from "./article-history-modal";
 import { cn } from "@/lib/utils";
@@ -138,6 +139,7 @@ export function ArticleTable({ articles, campaignId, isAdmin }: ArticleTableProp
   const router = useRouter();
   const [openDomains, setOpenDomains] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<FilterKey>("ALL");
+  const [checking, setChecking] = useState(false);
 
   const filteredArticles = useMemo(() => {
     if (activeFilter === "ALL") return articles;
@@ -208,8 +210,64 @@ export function ArticleTable({ articles, campaignId, isAdmin }: ArticleTableProp
     return acc;
   }, {});
 
+  const allDomains = Object.keys(grouped);
+  const allOpen = allDomains.length > 0 && allDomains.every((d) => openDomains.has(d));
+
+  async function handleCheckAll() {
+    setChecking(true);
+    toast.loading("Vérification de tous les backlinks en cours…", { id: "check-all" });
+    const res = await fetch(`/api/campaigns/${campaignId}/check-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "all" }),
+    });
+    setChecking(false);
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(`Vérification lancée pour ${data.count} backlink(s) — résultats disponibles dans quelques minutes`, { id: "check-all", duration: 6000 });
+    } else {
+      toast.error("Erreur lors du lancement des vérifications", { id: "check-all" });
+    }
+  }
+
   return (
     <div className="space-y-3">
+      {/* ── Barre d'actions globales ─────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setOpenDomains(new Set(Object.keys(
+              articles.reduce<Record<string, true>>((acc, a) => { acc[getHostname(a.articleUrl)] = true; return acc; }, {})
+            )))}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800"
+            title="Tout ouvrir"
+          >
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+            Tout ouvrir
+          </button>
+          <button
+            onClick={() => setOpenDomains(new Set())}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800"
+            title="Tout fermer"
+          >
+            <ChevronsDownUp className="h-3.5 w-3.5" />
+            Tout fermer
+          </button>
+        </div>
+        <button
+          onClick={handleCheckAll}
+          disabled={checking}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
+          title="Relancer tous les checks"
+        >
+          {checking
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <RotateCcw className="h-3.5 w-3.5" />
+          }
+          Re-vérifier tout
+        </button>
+      </div>
+
       {/* ── Filtres ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap">
         <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
