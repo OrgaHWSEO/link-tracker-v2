@@ -107,21 +107,23 @@ async function humanType(page: import("playwright").Page, selector: string, text
   }
 }
 
-export async function checkIndexation(articleId: string): Promise<void> {
-  const article = await prisma.article.findUnique({
-    where: { id: articleId },
-    select: { articleUrl: true },
-  });
-  if (!article) return;
-
-  // Attend son tour (1 requête Google à la fois, 6-11 s entre chaque)
-  const release = await acquireGoogleSlot();
-
-  let status: "INDEXED" | "NOT_INDEXED" | "UNKNOWN" = "UNKNOWN";
-
+/**
+ * Ouvre Google, tape la requête site:URL, et analyse la SERP.
+ * Retourne le statut d'indexation détecté.
+ */
+async function performGoogleSearch(
+  articleId: string,
+  articleUrl: string,
+  useProxy: boolean
+): Promise<"INDEXED" | "NOT_INDEXED" | "UNKNOWN"> {
   const browser = await getBrowser();
-  const proxy = await getProxyConfig();
+  const proxy = useProxy ? await getProxyConfig() : undefined;
   const ua = randomUserAgent();
+
+  appLog("INFO", "indexation.check", `Début vérification indexation`, {
+    articleId, url: articleUrl, proxy: proxy ? "oui" : "non (direct)",
+  });
+
   const context = await browser.newContext({
     viewport: randomViewport(),
     locale: "fr-FR",
@@ -134,10 +136,9 @@ export async function checkIndexation(articleId: string): Promise<void> {
   const page = await context.newPage();
 
   try {
-    const searchQuery = `site:${article.articleUrl}`;
-    appLog("INFO", "indexation.check", `Début vérification indexation`, { articleId, url: article.articleUrl, query: searchQuery });
+    const searchQuery = `site:${articleUrl}`;
 
-    // ── Étape 1 : aller sur Google.fr comme un humain ──────────────
+    // ── Étape 1 : aller sur Google comme un humain ─────────────────
     await page.goto("https://www.google.fr", {
       waitUntil: "domcontentloaded",
       timeout: 20_000,
@@ -149,17 +150,19 @@ export async function checkIndexation(articleId: string): Promise<void> {
     await sleep(500 + Math.random() * 500);
 
     // ── Étape 3 : trouver le champ de recherche et taper la requête ─
-    // Google utilise textarea ou input pour le champ de recherche
     const searchSelectors = [
       'textarea[name="q"]',
       'input[name="q"]',
       'textarea[title="Rechercher"]',
       'textarea[title="Search"]',
+      'textarea[title="Suche"]',
       'input[title="Rechercher"]',
       'input[title="Search"]',
+      'input[title="Suche"]',
       "[aria-label='Rech. Google']",
       "[aria-label='Rechercher']",
       "[aria-label='Search']",
+      "[aria-label='Suche']",
     ];
 
     let searchFieldFound = false;
@@ -167,7 +170,6 @@ export async function checkIndexation(articleId: string): Promise<void> {
       try {
         const field = page.locator(sel).first();
         if (await field.isVisible({ timeout: 3_000 })) {
-          console.log(`[indexation] Search field found: ${sel}`);
           await humanType(page, sel, searchQuery);
           searchFieldFound = true;
           break;
@@ -178,8 +180,7 @@ export async function checkIndexation(articleId: string): Promise<void> {
     }
 
     if (!searchFieldFound) {
-      console.error("[indexation] Search field not found on Google homepage");
-      // Fallback : navigation directe
+      appLog("WARN", "indexation.check", "Champ de recherche non trouvé, fallback navigation directe", { articleId, url: articleUrl });
       const query = encodeURIComponent(searchQuery);
       await page.goto(`https://www.google.fr/search?q=${query}&hl=fr`, {
         waitUntil: "domcontentloaded",
@@ -199,21 +200,18 @@ export async function checkIndexation(articleId: string): Promise<void> {
 
     // ── Détection ban IP / page Sorry ─────────────────────────────
     const currentUrl = page.url();
-    console.log(`[indexation] SERP URL: ${currentUrl}`);
 
     if (currentUrl.includes("/sorry/") || currentUrl.includes("sorry.google")) {
-      appLog("WARN", "indexation.check", "IP bloquée par Google (page sorry)", { articleId, url: article.articleUrl, serpUrl: currentUrl });
-      status = "UNKNOWN";
-      return;
+      appLog("WARN", "indexation.check", "IP bloquée par Google (page sorry)", { articleId, url: articleUrl, serpUrl: currentUrl });
+      return "UNKNOWN";
     }
 
     // ── Détection CAPTCHA ─────────────────────────────────────────
     const hasCaptcha =
       (await page.locator('iframe[src*="recaptcha"], form[action*="/sorry/"]').count()) > 0;
     if (hasCaptcha) {
-      appLog("WARN", "indexation.check", "CAPTCHA détecté par Google", { articleId, url: article.articleUrl, serpUrl: currentUrl });
-      status = "UNKNOWN";
-      return;
+      appLog("WARN", "indexation.check", "CAPTCHA détecté par Google", { articleId, url: articleUrl, serpUrl: currentUrl });
+      return "UNKNOWN";
     }
 
     // ── Comportement humain : scroll léger ────────────────────────
@@ -225,15 +223,13 @@ export async function checkIndexation(articleId: string): Promise<void> {
       .waitForSelector("#search, #rso, #topstuff, #main, #center_col, #rcnt, #botstuff", {
         timeout: 10_000,
       })
-      .catch(() => {
-        console.warn("[indexation] Main content selector not found within 10s");
-      });
+      .catch(() => {});
 
     // ── Analyse des résultats ─────────────────────────────────────
     const pageText = (await page.textContent("body")) ?? "";
     const lowerText = pageText.toLowerCase();
 
-    // Détection "aucun résultat"
+    // Détection "aucun résultat" (multilingue)
     const noResultSignals = [
       "n'a renvoyé aucun résultat",
       "n'a donné aucun résultat",
@@ -243,13 +239,15 @@ export async function checkIndexation(articleId: string): Promise<void> {
       "aucun résultat trouvé",
       "no results found",
       "0 résultat",
+      "keine ergebnisse",
+      "hat keine ergebnisse ergeben",
+      "keine übereinstimmung",
     ];
     const isNoResult = noResultSignals.some((s) => lowerText.includes(s.toLowerCase()));
 
     if (isNoResult) {
-      appLog("INFO", "indexation.check", `Page non indexée (aucun résultat Google)`, { articleId, url: article.articleUrl });
-      status = "NOT_INDEXED";
-      return;
+      appLog("INFO", "indexation.check", `Page non indexée (aucun résultat Google)`, { articleId, url: articleUrl });
+      return "NOT_INDEXED";
     }
 
     // Détection résultats organiques (sélecteurs larges)
@@ -267,35 +265,62 @@ export async function checkIndexation(articleId: string): Promise<void> {
     const resultCount = await page.locator(resultSelectors).count();
 
     if (resultCount > 0) {
-      appLog("INFO", "indexation.check", `Page indexée (${resultCount} résultat(s) Google)`, { articleId, url: article.articleUrl, resultCount });
-      status = "INDEXED";
-      return;
+      appLog("INFO", "indexation.check", `Page indexée (${resultCount} résultat(s) Google)`, { articleId, url: articleUrl, resultCount });
+      return "INDEXED";
     }
 
     // Fallback texte : le hostname de l'article apparaît dans la page
     const articleHostname = (() => {
-      try { return new URL(article.articleUrl).hostname; } catch { return ""; }
+      try { return new URL(articleUrl).hostname; } catch { return ""; }
     })();
     if (articleHostname && lowerText.includes(articleHostname.toLowerCase())) {
-      appLog("INFO", "indexation.check", `Page indexée (hostname trouvé dans le texte, fallback)`, { articleId, url: article.articleUrl, hostname: articleHostname });
-      status = "INDEXED";
-      return;
+      appLog("INFO", "indexation.check", `Page indexée (hostname trouvé dans le texte, fallback)`, { articleId, url: articleUrl, hostname: articleHostname });
+      return "INDEXED";
     }
 
     // On est sur la SERP mais aucun résultat → page non indexée
     if (currentUrl.includes("google.fr/search") || currentUrl.includes("google.com/search")) {
-      appLog("INFO", "indexation.check", `Page non indexée (SERP sans résultat)`, { articleId, url: article.articleUrl, serpUrl: currentUrl });
-      status = "NOT_INDEXED";
-    } else {
-      appLog("WARN", "indexation.check", `État indéterminé — URL inattendue après recherche`, { articleId, url: article.articleUrl, serpUrl: currentUrl });
-      status = "UNKNOWN";
+      appLog("INFO", "indexation.check", `Page non indexée (SERP sans résultat)`, { articleId, url: articleUrl, serpUrl: currentUrl });
+      return "NOT_INDEXED";
+    }
+
+    appLog("WARN", "indexation.check", `État indéterminé — URL inattendue après recherche`, { articleId, url: articleUrl, serpUrl: currentUrl });
+    return "UNKNOWN";
+  } finally {
+    await context.close();
+  }
+}
+
+export async function checkIndexation(articleId: string): Promise<void> {
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+    select: { articleUrl: true },
+  });
+  if (!article) return;
+
+  // Attend son tour (1 requête Google à la fois, 6-11 s entre chaque)
+  const release = await acquireGoogleSlot();
+
+  let status: "INDEXED" | "NOT_INDEXED" | "UNKNOWN" = "UNKNOWN";
+
+  try {
+    // Essai 1 : avec proxy (si configuré)
+    status = await performGoogleSearch(articleId, article.articleUrl, true);
+
+    // Essai 2 : si échec avec proxy, réessaie sans proxy
+    if (status === "UNKNOWN") {
+      const hasProxy = !!(await getProxyConfig());
+      if (hasProxy) {
+        appLog("WARN", "indexation.check", "Échec avec proxy, retry sans proxy", { articleId, url: article.articleUrl });
+        await sleep(2_000 + Math.random() * 2_000);
+        status = await performGoogleSearch(articleId, article.articleUrl, false);
+      }
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     appLog("ERROR", "indexation.check", `Erreur lors de la vérification d'indexation`, { articleId, url: article.articleUrl, error: errorMsg });
     status = "UNKNOWN";
   } finally {
-    await context.close();
     release();
   }
 
