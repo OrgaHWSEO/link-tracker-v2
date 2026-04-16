@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Megaphone, Settings, Link as LinkIcon } from "lucide-react";
+import { LayoutDashboard, Megaphone, Settings, ScrollText, Link as LinkIcon } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/campaigns", label: "Campagnes", icon: Megaphone },
+  { href: "/logs", label: "Logs", icon: ScrollText },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 

@@ -7,13 +7,15 @@ import {
   LayoutDashboard,
   Megaphone,
   Settings,
+  ScrollText,
   Link as LinkIcon,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/campaigns", label: "Campagnes", icon: Megaphone },
-  { href: "/settings", label: "Parametres", icon: Settings },
+  { href: "/logs", label: "Logs", icon: ScrollText },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
 export function MobileSidebar() {
