@@ -41,27 +41,45 @@ function randomUserAgent() {
  */
 async function handleConsentPage(page: import("playwright").Page): Promise<void> {
   const candidates = [
+    // Français
     'button:has-text("Tout accepter")',
     'button:has-text("Accepter tout")',
-    'button:has-text("Accept all")',
     'button:has-text("J\'accepte")',
+    // Anglais
+    'button:has-text("Accept all")',
     'button:has-text("I agree")',
+    // Allemand (serveur DE)
+    'button:has-text("Alle akzeptieren")',
+    'button:has-text("Alle annehmen")',
+    'button:has-text("Ich stimme zu")',
+    'button:has-text("Zustimmen")',
+    // Espagnol
+    'button:has-text("Aceptar todo")',
+    // Néerlandais
+    'button:has-text("Alles accepteren")',
+    // Italien
+    'button:has-text("Accetta tutto")',
+    // IDs et aria-labels génériques
     "[id='L2AGLb']",
     "[aria-label='Tout accepter']",
     "[aria-label='Accept all']",
+    "[aria-label='Alle akzeptieren']",
     "form[action*='consent'] button",
     "form[action*='save'] button[type='submit']",
     "form button[value='1']",
+    // Overlay/dialog de consentement
     "div[aria-modal='true'] button:has-text('Tout accepter')",
     "div[aria-modal='true'] button:has-text('Accept all')",
+    "div[aria-modal='true'] button:has-text('Alle akzeptieren')",
     "#dialog button:has-text('Tout accepter')",
+    "#dialog button:has-text('Alle akzeptieren')",
   ];
 
   for (const sel of candidates) {
     try {
       const btn = page.locator(sel).first();
       if (await btn.isVisible({ timeout: 1_500 })) {
-        console.log(`[indexation] Consent button found: ${sel}`);
+        appLog("INFO", "indexation.consent", `Bouton de consentement trouvé : ${sel}`, { selector: sel, url: page.url() });
         await btn.click();
         await sleep(2_000 + Math.random() * 1_000);
         // Si on était sur consent.google.com, attend le retour
@@ -74,6 +92,8 @@ async function handleConsentPage(page: import("playwright").Page): Promise<void>
       // Sélecteur non trouvé → suivant
     }
   }
+
+  appLog("WARN", "indexation.consent", "Aucun bouton de consentement trouvé", { url: page.url() });
 }
 
 /**
