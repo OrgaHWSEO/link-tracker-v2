@@ -41,6 +41,7 @@ enum IndexationStatus {
 enum IndexationSource {
   GSC
   SCRAPING
+  VALUESERP
 }
 
 enum AlertType {
